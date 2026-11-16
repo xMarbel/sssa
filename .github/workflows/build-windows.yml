@@ -9,6 +9,7 @@ permissions:
 
 jobs:
   build:
+    name: Build VILO EXE
     runs-on: windows-latest
 
     steps:
@@ -19,34 +20,74 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: pip
+          cache-dependency-path: requirements.txt
 
       - name: Zainstaluj biblioteki
+        shell: pwsh
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
           python -m pip install pyinstaller
 
-      - name: Sprawdz pliki VILO
+      - name: Sprawdz pliki projektu
         shell: pwsh
         run: |
-          if (!(Test-Path "static/index.html")) {
-            throw "Brak pliku static/index.html"
+          $files = @(
+            "backend_entry.py",
+            "server.py",
+            "index.html",
+            "style.css",
+            "app.js",
+            "main.js",
+            "favicon.png",
+            "vilo-icon.png",
+            "vilo.ico"
+          )
+
+          foreach ($file in $files) {
+            if (!(Test-Path $file)) {
+              throw "Brakuje pliku: $file"
+            }
           }
+
+          Write-Host "Wszystkie pliki VILO sa dostepne."
 
       - name: Zbuduj VILO EXE
         shell: pwsh
         run: |
-          python -m PyInstaller `
-            --noconfirm `
-            --clean `
-            --onefile `
-            --windowed `
-            --name VILO `
-            --icon vilo.ico `
-            --add-data "static;static" `
-            --collect-all fastapi `
-            --collect-all uvicorn `
-            backend_entry.py
+          $buildArgs = @(
+            "--noconfirm"
+            "--clean"
+            "--onefile"
+            "--windowed"
+            "--name=VILO"
+            "--icon=vilo.ico"
+            "--add-data=index.html;static"
+            "--add-data=style.css;static"
+            "--add-data=app.js;static"
+            "--add-data=main.js;static"
+            "--add-data=favicon.png;static"
+            "--add-data=vilo-icon.png;static"
+            "--collect-all=fastapi"
+            "--collect-all=uvicorn"
+            "backend_entry.py"
+          )
+
+          python -m PyInstaller @buildArgs
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Budowanie VILO nie powiodlo sie."
+          }
+
+      - name: Sprawdz wynik
+        shell: pwsh
+        run: |
+          if (!(Test-Path "dist/VILO.exe")) {
+            throw "Nie znaleziono pliku VILO.exe"
+          }
+
+          Write-Host "VILO.exe zostal zbudowany."
 
       - name: Udostepnij VILO
         uses: actions/upload-artifact@v4
