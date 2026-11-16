@@ -4,31 +4,53 @@ name: Build VILO Windows
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: windows-latest
 
     steps:
-      - name: Pobierz pliki
+      - name: Pobierz projekt
         uses: actions/checkout@v4
 
-      - name: Zainstaluj Python
+      - name: Przygotuj Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Zainstaluj zaleznosci
+      - name: Zainstaluj biblioteki
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pyinstaller
+          python -m pip install -r requirements.txt
+          python -m pip install pyinstaller
 
-      - name: Zbuduj VILO
+      - name: Sprawdz pliki VILO
+        shell: pwsh
         run: |
-          python -m PyInstaller --noconfirm --clean --onefile --windowed --name VILO backend_entry.py
+          if (!(Test-Path "static/index.html")) {
+            throw "Brak pliku static/index.html"
+          }
 
-      - name: Udostepnij EXE
+      - name: Zbuduj VILO EXE
+        shell: pwsh
+        run: |
+          python -m PyInstaller `
+            --noconfirm `
+            --clean `
+            --onefile `
+            --windowed `
+            --name VILO `
+            --icon vilo.ico `
+            --add-data "static;static" `
+            --collect-all fastapi `
+            --collect-all uvicorn `
+            backend_entry.py
+
+      - name: Udostepnij VILO
         uses: actions/upload-artifact@v4
         with:
           name: VILO-Windows
           path: dist/VILO.exe
+          if-no-files-found: error
